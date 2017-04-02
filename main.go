@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"regexp"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/mattn/go-shellwords"
@@ -74,18 +75,34 @@ func main() {
 			if !filenameEscape.Match([]byte(str[1])) {
 				continue
 			}
-			err = runCmdStr(fmt.Sprintf("convert -font %s/font/NotoSansCJKjp-Medium.otf -pointsize  30 label:'%s' %s/pic/%s.png", pwd, str[1], pwd, escape.Replace(str[0])))
-			if err != nil {
-				spew.Dump(err)
-				continue
-			}
+			if utf8.RuneCountInString(str[1]) > 4 {
+				for i := 0; i < 30; i++ {
+					err = runCmdStr(fmt.Sprintf("convert -font %s/font/NotoSansCJKjp-Medium.otf  -pointsize  30 -gravity West -annotate -%d+0 '%s%s' %s/init.png pic/%s_%05d.png", pwd, i*utf8.RuneCountInString(str[1]), str[1], str[1], pwd, escape.Replace(str[0]), i))
+					if err != nil {
+						spew.Dump(err)
+						continue
+					}
+				}
+				runCmdStr(fmt.Sprintf("convert -delay 10 %s/pic/%s_*.png -loop 0 -layers optimize %s/pic/%s.gif", pwd, escape.Replace(str[0]), pwd, escape.Replace(str[0])))
 
-			fmt.Println(fmt.Sprintf("%s/slack-emojinator/upload.py %s/pic/*", pwd, pwd))
-			stdoutStderr, err := exec.Command(fmt.Sprintf("%s/slack-emojinator/upload.py", pwd), fmt.Sprintf("%s/pic/%s.png", pwd, escape.Replace(str[0]))).CombinedOutput()
-			spew.Dump(string(stdoutStderr))
-			if err != nil {
-				spew.Dump(err)
-				continue
+				stdoutStderr, err := exec.Command(fmt.Sprintf("%s/slack-emojinator/upload.py", pwd), fmt.Sprintf("%s/pic/%s.gif", pwd, escape.Replace(str[0]))).CombinedOutput()
+				spew.Dump(string(stdoutStderr))
+				if err != nil {
+					spew.Dump(err)
+					continue
+				}
+			} else {
+				err = runCmdStr(fmt.Sprintf("convert -font %s/font/NotoSansCJKjp-Medium.otf -pointsize  30 label:'%s' %s/pic/%s.png", pwd, str[1], pwd, escape.Replace(str[0])))
+				if err != nil {
+					spew.Dump(err)
+					continue
+				}
+				stdoutStderr, err := exec.Command(fmt.Sprintf("%s/slack-emojinator/upload.py", pwd), fmt.Sprintf("%s/pic/%s.png", pwd, escape.Replace(str[0]))).CombinedOutput()
+				spew.Dump(string(stdoutStderr))
+				if err != nil {
+					spew.Dump(err)
+					continue
+				}
 			}
 
 			a, _ := rtm.GetEmoji()
